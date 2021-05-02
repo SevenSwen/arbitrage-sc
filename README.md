@@ -5,7 +5,6 @@ arbitrage-sc Contract
 
  - nodeJS v10.19.0 or later
 - npm 7.10.0 or later
-- Truffle v5.2.6 (core: 5.2.6) or later
 
 **Installation**
 

@@ -1,5 +1,7 @@
 # build
-build/
+artifacts/
+cache/
+typechain/
 
 # dependencies
 node_modules/
