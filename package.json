@@ -6,8 +6,8 @@
     "compile": "hardhat compile",
     "test": "bash ./scripts/test.sh",
     "flatten": "bash ./scripts/flatten.sh",
-    "prettier": "prettier --write contracts/**/*.sol",
-    "lint": "solhint contracts/**/*.sol"
+    "prettier": "prettier --write contracts/*.sol",
+    "lint": "solhint contracts/*.sol"
   },
   "keywords": [],
   "author": "",
