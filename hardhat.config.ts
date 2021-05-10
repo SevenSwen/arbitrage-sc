@@ -1,6 +1,7 @@
 import 'hardhat-typechain'
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-waffle'
+import './scripts/copy-uniswap-v3-artifacts.ts'
 
 export default {
     networks: {
