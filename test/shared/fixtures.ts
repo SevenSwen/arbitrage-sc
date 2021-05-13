@@ -22,7 +22,8 @@ interface UniswapFixture {
     sushiswapRouter: UniswapV2Router02
 }
 
-export const uniswapFixture: Fixture<UniswapFixture> = async ([wallet]) => {
+async function uniswapFixture(wallets: Wallet[]): Promise<UniswapFixture> {
+    const [wallet] = wallets
     const weth9 = (await waffle.deployContract(wallet, {
         bytecode: WETH9_BYTECODE,
         abi: WETH9_ABI,
@@ -71,7 +72,7 @@ interface SwapperFixture {
     externalSwapper: ExternalSwapper
 }
 
-export const swapperFixture: Fixture<SwapperFixture> = async ([wallet]) => {
+async function swapperFixture(): Promise<SwapperFixture> {
     const externalSwapperFactory = await ethers.getContractFactory('ExternalSwapper')
     const externalSwapper = (await externalSwapperFactory.deploy()) as ExternalSwapper
 
@@ -84,7 +85,7 @@ interface TokensFixture {
     token2: MockERC20
 }
 
-export const tokensFixture: Fixture<TokensFixture> = async ([wallet]) => {
+async function tokensFixture(): Promise<TokensFixture> {
     const tokenFactory = await ethers.getContractFactory('MockERC20')
     const tokenA = (await tokenFactory.deploy(BigNumber.from(2).pow(255))) as MockERC20
     const tokenB = (await tokenFactory.deploy(BigNumber.from(2).pow(255))) as MockERC20
@@ -95,4 +96,24 @@ export const tokensFixture: Fixture<TokensFixture> = async ([wallet]) => {
     )
 
     return { token0, token1, token2 }
+}
+
+type allContractsFixture = UniswapFixture & TokensFixture & SwapperFixture
+
+export const fixture: Fixture<allContractsFixture> = async function ([wallet]): Promise<allContractsFixture> {
+    const { weth9, uniswapFactory, uniswapRouter, sushiswapFactory, sushiswapRouter } = await uniswapFixture([wallet])
+    const { token0, token1, token2 } = await tokensFixture()
+    const { externalSwapper } = await swapperFixture()
+
+    return {
+        token0,
+        token1,
+        token2,
+        weth9,
+        uniswapFactory,
+        uniswapRouter,
+        sushiswapFactory,
+        sushiswapRouter,
+        externalSwapper,
+    }
 }
