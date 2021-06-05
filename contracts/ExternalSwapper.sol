@@ -4,19 +4,21 @@ pragma solidity =0.8.3;
 import {IUniswapV2Callee} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Callee.sol';
 import {IUniswapV2Router02} from '@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol';
 import {IUniswapV2Pair} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
+import {IUniswapV2Factory} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol';
 import {TransferHelper} from '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 
 contract ExternalSwapper is IUniswapV2Callee {
     struct InputPackage {
         address tokenIn;
         address tokenOut;
-        address factoryIn;
+        address pair;
         address routerOut;
+        uint256 amountRequired;
         uint256 amount;
         uint256 deadline;
     }
 
-    struct Params {
+    struct ParamsLoan {
         address pair;
         address token0;
         address token1;
@@ -25,37 +27,36 @@ contract ExternalSwapper is IUniswapV2Callee {
         bytes data;
     }
 
+    struct ParamsCallback {
+        address pairIn;
+        address pairOut;
+        uint256 amount;
+        uint256 amountRequired;
+    }
+
     address private _permissionedPairAddress = address(0);
 
-    constructor() {}
+    modifier ensure(uint deadline) {
+        require(deadline >= block.timestamp, 'deadline');
+        _;
+    }
 
     receive() external payable {}
 
-    function flashLoan(InputPackage calldata package) external {
-        _permissionedPairAddress = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            hex'ff',
-                            package.factoryIn,
-                            keccak256(abi.encodePacked(package.tokenIn, package.tokenOut)),
-                            hex'96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f' // init code hash
-                        )
-                    )
-                )
-            )
-        );
-        Params memory params;
-        params.pair = _permissionedPairAddress;
-        (params.token0, params.token1) = package.tokenIn < package.tokenOut
-            ? (package.tokenIn, package.tokenOut)
-            : (package.tokenOut, package.tokenIn);
-        params.amount0 = package.tokenIn == params.token0 ? package.amount : 0;
-        params.amount1 = package.tokenIn == params.token1 ? package.amount : 0;
-        params.data = abi.encode(package.routerOut, package.deadline);
+    function flashLoan(InputPackage calldata package) external ensure(package.deadline) {
+        address _pairAddress = package.pair;
+        IUniswapV2Pair _pair = IUniswapV2Pair(_pairAddress);
 
-        IUniswapV2Pair(params.pair).swap(params.amount0, params.amount1, address(this), params.data);
+        _permissionedPairAddress = _pairAddress;
+        ParamsLoan memory params;
+        params.pair = _pairAddress;
+        (params.token0, params.token1) = (_pair.token0(), _pair.token1());
+        (params.amount0, params.amount1) = package.tokenIn == params.token0
+            ? (package.amount, uint256(0))
+            : (uint256(0), package.amount);
+        params.data = abi.encode(package.routerOut, package.amountRequired);
+
+        _pair.swap(params.amount0, params.amount1, address(this), params.data);
     }
 
     function uniswapV2Call(
@@ -67,44 +68,32 @@ contract ExternalSwapper is IUniswapV2Callee {
         assert(sender == address(this));
         assert(msg.sender == _permissionedPairAddress);
 
-        (address routerOut, uint256 deadline) = abi.decode(data, (address, uint256));
+        ParamsCallback memory _params;
+        address routerOutAddress;
+        (routerOutAddress, _params.amountRequired) = abi.decode(data, (address, uint256));
 
-        Params memory params;
-        params.pair = msg.sender;
-        IUniswapV2Pair pair = IUniswapV2Pair(params.pair);
-        params.token0 = pair.token0();
-        params.token1 = pair.token1();
+        _params.pairIn = msg.sender;
+        IUniswapV2Pair pair = IUniswapV2Pair(_params.pairIn);
+
         address[] memory _path = new address[](2);
-
         if (amount0 == 0) {
-            _path[0] = params.token1;
-            _path[1] = params.token0;
-            params.amount0 = amount1;
+            _path[0] = pair.token1();
+            _path[1] = pair.token0();
+            _params.amount = amount1;
         } else {
-            _path[0] = params.token1;
-            _path[1] = params.token0;
-            params.amount0 = amount0;
+            _path[0] = pair.token0();
+            _path[1] = pair.token1();
+            _params.amount = amount0;
         }
 
-        TransferHelper.safeApprove(_path[0], routerOut, params.amount0);
-        uint256 amountRequired;
-        {
-            (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
-            (uint256 reserveA, uint256 reserveB) =
-                _path[1] == params.token0 ? (reserve0, reserve1) : (reserve1, reserve0); // TODO: may be replace reserve0, reserve1
-            uint256 numerator = reserveA * params.amount0 * 1000;
-            uint256 denominator = (reserveB - params.amount0) * 997;
-            amountRequired = (numerator / denominator) + 1;
-        }
-        uint256 amountReceived =
-            IUniswapV2Router02(routerOut).swapExactTokensForTokens(
-                params.amount0,
-                0,
-                _path,
-                address(this),
-                block.timestamp + deadline
-            )[1];
-        require(amountReceived > amountRequired, 'profit < 0');
-        TransferHelper.safeTransfer(_path[1], params.pair, amountRequired);
+        IUniswapV2Router02 routerOut = IUniswapV2Router02(routerOutAddress);
+        _params.pairOut = IUniswapV2Factory(routerOut.factory()).getPair(_path[0], _path[1]);
+        uint256 _amountReceived = routerOut.getAmountsOut(_params.amount, _path)[1];
+        TransferHelper.safeTransfer(_path[0], _params.pairOut, _params.amount);
+        (uint256 amount0Out, uint256 amount1Out) =
+            _path[0] == pair.token0() ? (uint256(0), _amountReceived) : (_amountReceived, uint256(0));
+        IUniswapV2Pair(_params.pairOut).swap(amount0Out, amount1Out, address(this), new bytes(0));
+        require(_amountReceived > _params.amountRequired, 'profit < 0');
+        TransferHelper.safeTransfer(_path[1], _params.pairIn, _params.amountRequired);
     }
 }

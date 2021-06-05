@@ -1,5 +1,7 @@
 import { abi as FACTORY_V2_ABI, bytecode as FACTORY_V2_BYTECODE } from '@uniswap/v2-core/build/UniswapV2Factory.json'
 import { abi as ROUTER_V2_ABI, bytecode as ROUTER_V2_BYTECODE } from '@uniswap/v2-periphery/build/UniswapV2Router02.json'
+import { bytecode as FACTORY_S_BYTECODE } from '@sushiswap/core/deployments/rinkeby/UniswapV2Factory.json'
+import { bytecode as ROUTER_S_BYTECODE } from '@sushiswap/core/deployments/rinkeby/UniswapV2Router02.json'
 import { abi as WETH9_ABI, bytecode as WETH9_BYTECODE } from '@uniswap/v2-periphery/build/WETH9.json'
 import { ethers, waffle } from 'hardhat'
 import { Fixture } from 'ethereum-waffle'
@@ -50,7 +52,7 @@ async function uniswapFixture(wallets: Wallet[]): Promise<UniswapFixture> {
     const sushiswapFactory = await waffle.deployContract(
         wallet,
         {
-            bytecode: FACTORY_V2_BYTECODE,
+            bytecode: FACTORY_S_BYTECODE,
             abi: FACTORY_V2_ABI,
         },
         [wallet.address]
@@ -59,10 +61,10 @@ async function uniswapFixture(wallets: Wallet[]): Promise<UniswapFixture> {
     const sushiswapRouter = await waffle.deployContract(
         wallet,
         {
-            bytecode: ROUTER_V2_BYTECODE,
+            bytecode: ROUTER_S_BYTECODE,
             abi: ROUTER_V2_ABI,
         },
-        [uniswapFactory.address, weth9.address]
+        [sushiswapFactory.address, weth9.address]
     ) as UniswapV2Router02
 
     return { weth9, uniswapFactory, uniswapRouter, sushiswapFactory, sushiswapRouter }

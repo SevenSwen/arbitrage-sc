@@ -42,44 +42,48 @@ describe('test', () => {
 
     it('run flash loan (wbtc-dai)', async () => {
         await token0.approve(uniswapRouter.address, ethers.utils.parseEther('250000'))
-        await token1.approve(uniswapRouter.address, ethers.utils.parseEther('10'))
+        await token1.approve(uniswapRouter.address, ethers.utils.parseUnits('10', '9'))
         await uniswapRouter.addLiquidity(
             token0.address,
             token1.address,
             ethers.utils.parseEther('250000'), // 1 WBTC = 25000 DAI
-            ethers.utils.parseEther('10'),
+            ethers.utils.parseUnits('10', '9'),
             0,
             0,
             alice.address,
-            1623572523, // TODO: change to now
+            1923572523, // TODO: change to now
         )
 
         await token0.approve(sushiswapRouter.address, ethers.utils.parseEther('350000'))
-        await token1.approve(sushiswapRouter.address, ethers.utils.parseEther('10'))
+        await token1.approve(sushiswapRouter.address, ethers.utils.parseUnits('10', '9'))
         await sushiswapRouter.addLiquidity(
             token0.address,
             token1.address,
             ethers.utils.parseEther('350000'), // 1 WBTC = 35,000 DAI
-            ethers.utils.parseEther('10'),
+            ethers.utils.parseUnits('10', '9'),
             0,
             0,
             alice.address,
-            1623572523, // TODO: change to now
+            1923572523, // TODO: change to now
         )
-        expect(await token0.balanceOf(alice.address)).to.equal(ethers.utils.parseEther('0'))
-        expect(await token1.balanceOf(alice.address)).to.equal(ethers.utils.parseEther('0'))
+        expect(await token0.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
+        expect(await token1.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
 
-        await externalSwapper.flashLoan({
-            tokenIn: token0.address,
-            tokenOut: token1.address,
-            factoryIn: uniswapFactory.address,
+        const amount = ethers.utils.parseUnits('0.87', '9');
+        const amountRequired = (await uniswapRouter.getAmountsIn(amount, [token0.address, token1.address]))[0];
+
+        await externalSwapper.connect(alice).flashLoan({
+            tokenIn: token1.address,
+            tokenOut: token0.address,
+            pair: await uniswapFactory.getPair(token0.address, token1.address),
             routerOut: sushiswapRouter.address,
-            amount: ethers.utils.parseEther('0.87'),
-            deadline: 1623572523, // TODO: change to now
+            amountRequired: amountRequired,
+            amount: amount,
+            deadline: 1923572523, // TODO: change to now
         })
 
-        expect(await token0.balanceOf(alice.address)).to.equal(ethers.utils.parseEther('0'))
-        const balance = await token1.balanceOf(alice.address);
+        expect(await token1.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
+        const balance = await token0.balanceOf(externalSwapper.address);
         console.log('(swap 1 WBTC) DAI balance:', ethers.utils.formatEther(balance));
     })
 

@@ -1,6 +1,8 @@
 import 'hardhat-typechain'
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-waffle'
+import "solidity-coverage"
+import "hardhat-gas-reporter"
 import './scripts/copy-uniswap-v3-artifacts.ts'
 
 export default {
