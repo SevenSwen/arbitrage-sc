@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.8.3;
-import "hardhat/console.sol";
 
 import {IUniswapV2Callee} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Callee.sol';
 import {IUniswapV2Router02} from '@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol';
@@ -94,8 +93,6 @@ contract ExternalSwapper is IUniswapV2Callee {
         (uint256 amount0Out, uint256 amount1Out) =
             _path[0] == pair.token0() ? (uint256(0), _amountReceived) : (_amountReceived, uint256(0));
         IUniswapV2Pair(_params.pairOut).swap(amount0Out, amount1Out, address(this), new bytes(0));
-        console.log('amount0, amount1', amount0, amount1);
-        console.log('_amountReceived, amountRequired', _amountReceived, _params.amountRequired);
         require(_amountReceived > _params.amountRequired, 'profit < 0');
         TransferHelper.safeTransfer(_path[1], _params.pairIn, _params.amountRequired);
     }

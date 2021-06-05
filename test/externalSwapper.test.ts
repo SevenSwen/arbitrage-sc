@@ -8,7 +8,7 @@ import {ExternalSwapper, UniswapV2Factory, UniswapV2Router02, WETH9, MockERC20} 
 const createFixtureLoader = waffle.createFixtureLoader
 
 describe('test', () => {
-    const [wallet, alice, other] = waffle.provider.getWallets()
+    const [wallet, alice, bob, other] = waffle.provider.getWallets()
 
     let uniswapFactory: UniswapV2Factory
     let sushiswapFactory: UniswapV2Factory
@@ -19,6 +19,7 @@ describe('test', () => {
     let token0: MockERC20
     let token1: MockERC20
     let token2: MockERC20
+    let now: number
 
     let loadFixture: ReturnType<typeof createFixtureLoader>
 
@@ -43,6 +44,7 @@ describe('test', () => {
     it('run flash loan (wbtc-dai)', async () => {
         await token0.approve(uniswapRouter.address, ethers.utils.parseEther('250000'))
         await token1.approve(uniswapRouter.address, ethers.utils.parseUnits('10', '9'))
+        now = (new Date()).getTime() / 1000 | 0
         await uniswapRouter.addLiquidity(
             token0.address,
             token1.address,
@@ -51,11 +53,12 @@ describe('test', () => {
             0,
             0,
             alice.address,
-            1923572523, // TODO: change to now
+            BigNumber.from(now + 60),
         )
 
         await token0.approve(sushiswapRouter.address, ethers.utils.parseEther('350000'))
         await token1.approve(sushiswapRouter.address, ethers.utils.parseUnits('10', '9'))
+        now = (new Date()).getTime() / 1000 | 0
         await sushiswapRouter.addLiquidity(
             token0.address,
             token1.address,
@@ -64,7 +67,7 @@ describe('test', () => {
             0,
             0,
             alice.address,
-            1923572523, // TODO: change to now
+            BigNumber.from(now + 60),
         )
         expect(await token0.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
         expect(await token1.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
@@ -72,14 +75,15 @@ describe('test', () => {
         const amount = ethers.utils.parseUnits('0.87', '9');
         const amountRequired = (await uniswapRouter.getAmountsIn(amount, [token0.address, token1.address]))[0];
 
-        await externalSwapper.connect(alice).flashLoan({
+        now = (new Date()).getTime() / 1000 | 0
+        await externalSwapper.connect(bob).flashLoan({
             tokenIn: token1.address,
             tokenOut: token0.address,
             pair: await uniswapFactory.getPair(token0.address, token1.address),
             routerOut: sushiswapRouter.address,
             amountRequired: amountRequired,
             amount: amount,
-            deadline: 1923572523, // TODO: change to now
+            deadline: BigNumber.from(now + 60),
         })
 
         expect(await token1.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
@@ -90,6 +94,7 @@ describe('test', () => {
     it('test', async () => {
         await token0.approve(uniswapRouter.address, ethers.utils.parseEther('479096246133.332078885965615880'))
         await token1.approve(uniswapRouter.address, ethers.utils.parseEther('2035.106916166573058792'))
+        now = (new Date()).getTime() / 1000 | 0
         await uniswapRouter.addLiquidity(
             token0.address,
             token1.address,
@@ -98,11 +103,12 @@ describe('test', () => {
             0,
             0,
             alice.address,
-            1923572523, // TODO: change to now
+            BigNumber.from(now + 60),
         )
 
         await token0.approve(sushiswapRouter.address, ethers.utils.parseEther('50340792.388814552382923537'))
         await token1.approve(sushiswapRouter.address, ethers.utils.parseEther('0.091072766630374925'))
+        now = (new Date()).getTime() / 1000 | 0
         await sushiswapRouter.addLiquidity(
             token0.address,
             token1.address,
@@ -111,22 +117,22 @@ describe('test', () => {
             0,
             0,
             alice.address,
-            1923572523, // TODO: change to now
+            BigNumber.from(now + 60),
         )
         expect(await token0.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
         expect(await token1.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
 
         const amount = ethers.utils.parseEther('17402539.933738453216109790');
         const amountRequired = (await sushiswapRouter.getAmountsIn(amount, [token1.address, token0.address]))[0];
-
-        await externalSwapper.connect(alice).flashLoan({
+        now = (new Date()).getTime() / 1000 | 0
+        await externalSwapper.connect(bob).flashLoan({
             tokenIn: token0.address,
             tokenOut: token1.address,
             pair: await sushiswapFactory.getPair(token0.address, token1.address),
             routerOut: uniswapRouter.address,
             amountRequired: amountRequired,
             amount: amount,
-            deadline: 1923572523, // TODO: change to now
+            deadline: BigNumber.from(now + 60),
         })
 
         expect(await token0.balanceOf(externalSwapper.address)).to.equal(ethers.utils.parseEther('0'))
