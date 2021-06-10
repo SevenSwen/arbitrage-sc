@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.8.3;
 
+import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IUniswapV2Callee} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Callee.sol';
 import {IUniswapV2Router02} from '@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol';
 import {IUniswapV2Pair} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol';
 import {IUniswapV2Factory} from '@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol';
 import {TransferHelper} from '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 
-contract ExternalSwapper is IUniswapV2Callee {
+contract ExternalSwapper is IUniswapV2Callee, Ownable {
     struct InputPackage {
         address tokenIn;
         address tokenOut;
@@ -42,6 +44,11 @@ contract ExternalSwapper is IUniswapV2Callee {
     }
 
     receive() external payable {}
+
+    function getReward(IERC20 token) external onlyOwner {
+        uint256 balance = token.balanceOf(address(this));
+        token.transfer(msg.sender, balance);
+    }
 
     function flashLoan(InputPackage calldata package) external ensure(package.deadline) {
         address _pairAddress = package.pair;
