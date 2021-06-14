@@ -10,7 +10,7 @@ import {IUniswapV2Factory} from '@uniswap/v2-core/contracts/interfaces/IUniswapV
 import {TransferHelper} from '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 
 contract ExternalSwapper is IUniswapV2Callee, Ownable {
-    struct InputPackage {
+    struct InputFlashLoanPackage {
         address tokenIn;
         address tokenOut;
         address pair;
@@ -29,6 +29,22 @@ contract ExternalSwapper is IUniswapV2Callee, Ownable {
         bytes data;
     }
 
+    struct InputMultiSwapPackage {
+        uint256 amountIn;
+        address tokenIn;
+        address[] pairs;
+        uint256[] amountsOut;
+        uint256 deadline;
+    }
+
+    struct ParamsMultiSwap {
+        uint256 length;
+        address tokenIn;
+        uint256 amountIn;
+        address tokenOut;
+        uint256 amountOut;
+    }
+
     struct ParamsCallback {
         address pairIn;
         address pairOut;
@@ -36,10 +52,16 @@ contract ExternalSwapper is IUniswapV2Callee, Ownable {
         uint256 amountRequired;
     }
 
-    address private _permissionedPairAddress = address(0);
+    address private _permissionedPairAddress;
+    address private _backend;
 
-    modifier ensure(uint deadline) {
+    modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, 'deadline');
+        _;
+    }
+
+    modifier onlyBackend() {
+        require(msg.sender == _backend, 'backend');
         _;
     }
 
@@ -50,7 +72,20 @@ contract ExternalSwapper is IUniswapV2Callee, Ownable {
         token.transfer(msg.sender, balance);
     }
 
-    function flashLoan(InputPackage calldata package) external ensure(package.deadline) {
+    function getReward(uint256 amount) external onlyOwner {
+        address payable _msgSender = payable(msg.sender);
+        _msgSender.transfer(amount);
+    }
+
+    function getBackend() external view onlyOwner returns (address) {
+        return _backend;
+    }
+
+    function setBackend(address backend) external onlyOwner {
+        _backend = backend;
+    }
+
+    function flashLoan(InputFlashLoanPackage calldata package) external onlyBackend ensure(package.deadline) {
         address _pairAddress = package.pair;
         IUniswapV2Pair _pair = IUniswapV2Pair(_pairAddress);
 
@@ -66,12 +101,36 @@ contract ExternalSwapper is IUniswapV2Callee, Ownable {
         _pair.swap(params.amount0, params.amount1, address(this), params.data);
     }
 
+    function multiSwap(InputMultiSwapPackage calldata package) external onlyBackend ensure(package.deadline) {
+        ParamsMultiSwap memory msParams;
+        msParams.length = package.pairs.length;
+        msParams.tokenIn = package.tokenIn;
+        msParams.tokenOut;
+        msParams.amountIn = package.amountIn;
+        ParamsLoan memory params;
+        TransferHelper.safeTransferFrom(msParams.tokenIn, msg.sender, package.pairs[0], msParams.amountIn);
+        for (uint256 i = 0; i < msParams.length; i++) {
+            params.pair = package.pairs[i];
+            IUniswapV2Pair _pair = IUniswapV2Pair(params.pair);
+            (params.token0, params.token1) = (_pair.token0(), _pair.token1());
+            msParams.amountOut = package.amountsOut[i];
+            (params.amount0, params.amount1, msParams.tokenOut) = msParams.tokenIn == params.token1
+                ? (msParams.amountOut, uint256(0), params.token0)
+                : (uint256(0), msParams.amountOut, params.token1);
+            address dest = (i + 1) < msParams.length ? package.pairs[i + 1] : address(this);
+            _pair.swap(params.amount0, params.amount1, dest, new bytes(0));
+        }
+    }
+
     function uniswapV2Call(
         address sender,
         uint256 amount0,
         uint256 amount1,
         bytes calldata data
     ) external override {
+        if (data.length == 0) {
+            return;
+        }
         assert(sender == address(this));
         assert(msg.sender == _permissionedPairAddress);
 

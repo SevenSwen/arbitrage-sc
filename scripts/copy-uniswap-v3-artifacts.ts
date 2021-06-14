@@ -19,11 +19,13 @@ subtask(TASK_CREATE_UNISWAPV3_ARTIFACT, async (_, { artifacts }) => {
         path.join((artifacts as any)['_artifactsPath'], '@uniswap/v2-core/contracts'),
         { overwrite: false }
     )
+    fse.remove(path.join((artifacts as any)['_artifactsPath'], '@uniswap/v2-core/contracts/Combined-Json.json'))
     fse.copySync(
         path.join(__dirname, '../node_modules/@uniswap/v2-periphery/build'),
         path.join((artifacts as any)['_artifactsPath'], '@uniswap/v2-periphery/contracts'),
         { overwrite: false }
     )
+    fse.remove(path.join((artifacts as any)['_artifactsPath'], '@uniswap/v2-periphery/contracts/Combined-Json.json'))
     fse.copySync(
         path.join(__dirname, '../node_modules/@sushiswap/core/deployments/rinkeby/UniswapV2Factory.json'),
         path.join((artifacts as any)['_artifactsPath'], '@sushiswap/core/contracts/UniswapV2Factory.json'),
