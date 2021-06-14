@@ -20,12 +20,13 @@ export default {
         mainnet: {
             url: `https://mainnet.infura.io/v3/${process.env.INFURA_ID}`,
             chainId: 1,
-            gas: 800000,
             gasPrice: 7000000000,
             accounts: {mnemonic: mnemonic}
         },
         rinkeby: {
             url: `https://rinkeby.infura.io/v3/${process.env.INFURA_ID}`,
+            chainId: 4,
+            gasPrice: 7000000000,
             accounts: {mnemonic: mnemonic}
         },
     },
